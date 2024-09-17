@@ -1,74 +1,92 @@
+# utils/db_utils.py
 import pandas as pd
-from bcrypt import hashpw, gensalt, checkpw
+import os
 
-def check_existing_username(username):
-    # Carregar dados de usuários
-    users = pd.read_parquet("data/users.parquet")
-    
-    # Verificar se o usuário já existe
-    return not users[users['email'] == username].empty
+# Verifica se o arquivo Parquet existe e retorna um DataFrame vazio se não existir
+def load_parquet_file(filepath, columns):
+    if not os.path.exists(filepath):
+        return pd.DataFrame(columns=columns)
+    return pd.read_parquet(filepath)
 
-def register_user(username, password):
-    # Carregar dados de usuários
-    users = pd.read_parquet("data/users.parquet")
-    
-    # Verificar se o usuário já existe
-    if check_existing_username(username):
-        return "user_exists"
-    
-    # Gerar hash da senha
-    hashed_password = hashpw(password.encode('utf-8'), gensalt())
-    
-    # Adicionar novo usuário
-    new_user = pd.DataFrame({
-        "email": [username],
-        "password": [hashed_password.decode('utf-8')],
-        "user_id": [len(users) + 1]  # Implementar função para gerar ID único se necessário
+def save_parquet_file(df, filepath):
+    df.to_parquet(filepath)
+
+# Funções para carregar dados
+def get_user_data():
+    """Retorna os dados dos usuários."""
+    return load_parquet_file('data/users.parquet', ['user_id', 'email', 'password'])
+
+def get_goals_data():
+    """Retorna os dados das metas."""
+    return load_parquet_file('data/goals.parquet', ['goal_id', 'user_id', 'goal_name', 'goal_amount', 'date'])
+
+def get_incomes_data():
+    """Retorna os dados das receitas."""
+    return load_parquet_file('data/incomes.parquet', ['income_id', 'user_id', 'income_name', 'amount', 'date'])
+
+def get_expenses_data():
+    """Retorna os dados das despesas."""
+    return load_parquet_file('data/expenses.parquet', ['expense_id', 'user_id', 'expense_name', 'amount', 'date'])
+
+# Funções para salvar dados
+def save_user_data(users_df):
+    """Salva os dados dos usuários."""
+    save_parquet_file(users_df, 'data/users.parquet')
+
+def save_goals_data(goals_df):
+    """Salva os dados das metas."""
+    save_parquet_file(goals_df, 'data/goals.parquet')
+
+def save_incomes_data(incomes_df):
+    """Salva os dados das receitas."""
+    save_parquet_file(incomes_df, 'data/incomes.parquet')
+
+def save_expenses_data(expenses_df):
+    """Salva os dados das despesas."""
+    save_parquet_file(expenses_df, 'data/expenses.parquet')
+
+# Função para gerar ID único com base no último ID registrado
+def get_next_id(df, id_column):
+    if df.empty:
+        return 1
+    return df[id_column].max() + 1
+
+# Funções para adicionar novos registros
+def add_new_goal(user_id, goal_name, goal_amount, date):
+    """Adiciona uma nova meta ao arquivo Parquet."""
+    goals = get_goals_data()
+    new_goal = pd.DataFrame({
+        'goal_id': [get_next_id(goals, 'goal_id')],
+        'user_id': [user_id],
+        'goal_name': [goal_name],
+        'goal_amount': [goal_amount],
+        'date': [date]
     })
-    users = pd.concat([users, new_user], ignore_index=True)
-    
-    # Salvar de volta no arquivo Parquet
-    users.to_parquet("data/users.parquet", index=False)
-    
-    return "registration_successful"
+    updated_goals = pd.concat([goals, new_goal], ignore_index=True)
+    save_goals_data(updated_goals)
 
-def authenticate_user(username, password):
-    # Carregar dados de usuários
-    users = pd.read_parquet("data/users.parquet")
-    
-    # Verificar se o usuário existe
-    user = users[users['email'] == username]
-    if user.empty:
-        return "user_not_found"
-    
-    # Verificar se a senha está correta
-    hashed_password = user.iloc[0]['password'].encode('utf-8')
-    if not checkpw(password.encode('utf-8'), hashed_password):
-        return "incorrect_password"
-    
-    # Retornar o ID do usuário
-    return user.iloc[0]['user_id']
+def add_new_income(user_id, income_name, amount, date):
+    """Adiciona uma nova receita ao arquivo Parquet."""
+    incomes = get_incomes_data()
+    new_income = pd.DataFrame({
+        'income_id': [get_next_id(incomes, 'income_id')],
+        'user_id': [user_id],
+        'income_name': [income_name],
+        'amount': [amount],
+        'date': [date]
+    })
+    updated_incomes = pd.concat([incomes, new_income], ignore_index=True)
+    save_incomes_data(updated_incomes)
 
-def update_user_password(username, new_password):
-    try:
-        # Carregar dados de usuários
-        users = pd.read_parquet("data/users.parquet")
-        
-        # Verificar se o usuário existe
-        user_index = users.index[users['email'] == username].tolist()
-        if not user_index:
-            return "user_not_found"
-        
-        # Gerar hash da nova senha
-        hashed_password = hashpw(new_password.encode('utf-8'), gensalt())
-        
-        # Atualizar a senha do usuário
-        users.at[user_index[0], 'password'] = hashed_password.decode('utf-8')
-        
-        # Salvar de volta no arquivo Parquet
-        users.to_parquet("data/users.parquet", index=False)
-        
-        return "update_successful"
-    except Exception as e:
-        print(f"Erro ao atualizar a senha: {e}")
-        return "update_failed"
+def add_new_expense(user_id, expense_name, amount, date):
+    """Adiciona uma nova despesa ao arquivo Parquet."""
+    expenses = get_expenses_data()
+    new_expense = pd.DataFrame({
+        'expense_id': [get_next_id(expenses, 'expense_id')],
+        'user_id': [user_id],
+        'expense_name': [expense_name],
+        'amount': [amount],
+        'date': [date]
+    })
+    updated_expenses = pd.concat([expenses, new_expense], ignore_index=True)
+    save_expenses_data(updated_expenses)

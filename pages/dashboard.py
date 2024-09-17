@@ -1,103 +1,56 @@
 import streamlit as st
 import pandas as pd
-from utils.file_utils import initialize_data_files
+import os
+
+def set_user_info(user_id, user_email):
+    st.session_state['current_user_id'] = user_id
+    st.session_state['current_user_email'] = user_email
 
 def app():
-    # CONFIGS
-    YEAR = pd.Timestamp.now().year
-    PREVIOUS_YEAR = YEAR - 1
+    st.title("Dashboard")
+    
+    # Exibir as informações do usuário na página
+    st.write(f"Bem-vindo, {st.session_state.get('current_user_email', 'Usuário')}")
 
-    st.title("Dashboard de Controle Financeiro")
+    # Função para carregar dados com verificação de existência de arquivos
+    def load_parquet_file(filepath, default_columns):
+        if os.path.exists(filepath):
+            return pd.read_parquet(filepath)
+        return pd.DataFrame(columns=default_columns)
 
-    # Inicializar arquivos de dados
-    initialize_data_files()
+    # Carregar dados de metas, receitas e despesas com verificação de existência
+    goals = load_parquet_file('data/goals.parquet', ['goal_id', 'user_id', 'goal_name', 'goal_amount', 'date'])
+    incomes = load_parquet_file('data/incomes.parquet', ['income_id', 'user_id', 'income_name', 'amount', 'date'])
+    expenses = load_parquet_file('data/expenses.parquet', ['expense_id', 'user_id', 'expense_name', 'amount', 'date'])
 
-    # Função para carregar e preparar dados
-    @st.cache_data
-    def get_and_prepare_data(file_path):
-        df = pd.read_parquet(file_path).assign(
-            date=lambda df: pd.to_datetime(df["date"]),
-            month=lambda df: df["date"].dt.month,
-            year=lambda df: df["date"].dt.year,
-        )
-        return df
+    # Filtrar dados do usuário logado
+    user_goals = goals[goals['user_id'] == st.session_state.get('current_user_id')]
+    user_incomes = incomes[incomes['user_id'] == st.session_state.get('current_user_id')]
+    user_expenses = expenses[expenses['user_id'] == st.session_state.get('current_user_id')]
 
-    # Botão para atualizar os dados
-    if st.button("Atualizar Dados"):
-        st.rerun()
-
-    # Carregar dados
-    goals = get_and_prepare_data("data/goals.parquet")
-    incomes = get_and_prepare_data("data/incomes.parquet")
-    expenses = get_and_prepare_data("data/expenses.parquet")
-
-    # Calcular receitas e despesas totais por ano
-    total_incomes = incomes.groupby("year")["amount"].sum().fillna(0)
-    total_expenses = expenses.groupby("year")["amount"].sum().fillna(0)
-
-    # Calcular mudança percentual
-    def calculate_change(current, previous):
-        if previous == 0:
-            return 0
-        return ((current - previous) / previous) * 100
-
-    income_change = calculate_change(
-        total_incomes.get(YEAR, 0),
-        total_incomes.get(PREVIOUS_YEAR, 0)
-    )
-
-    expense_change = calculate_change(
-        total_expenses.get(YEAR, 0),
-        total_expenses.get(PREVIOUS_YEAR, 0)
-    )
-
-    # Exibir métricas em cartões modernos
-    st.write("### Visão Geral")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.write("#### Receitas Totais")
-        st.metric(
-            label="Receitas Totais",
-            value=f"R$ {total_incomes.get(YEAR, 0):,.2f}",
-            delta=f"{income_change:.2f}% vs. {PREVIOUS_YEAR}",
-            delta_color="inverse"
-        )
-
-    with col2:
-        st.write("#### Despesas Totais")
-        st.metric(
-            label="Despesas Totais",
-            value=f"R$ {total_expenses.get(YEAR, 0):,.2f}",
-            delta=f"{expense_change:.2f}% vs. {PREVIOUS_YEAR}",
-            delta_color="inverse"
-        )
-
-    # Seleção de campos
-    left_col, right_col = st.columns(2)
-    analysis_type = left_col.selectbox(
-        label="Análise por:",
-        options=["Mês", "Categoria"],
-        key="analysis_type",
-    )
-    selected_year = right_col.selectbox("Selecione o ano:", [YEAR, PREVIOUS_YEAR])
-
-    # Exibir o ano acima do gráfico com base na seleção
-    st.write(f"**Dados para {selected_year}**")
-
-    # Filtrar dados com base na seleção para visualização
-    if analysis_type == "Categoria":
-        filtered_incomes = incomes.query("year == @selected_year").groupby("category")["amount"].sum().reset_index()
-        filtered_expenses = expenses.query("year == @selected_year").groupby("category")["amount"].sum().reset_index()
+    # Exibir resumo
+    st.subheader("Resumo")
+    st.write(f"Metas: {len(user_goals)}")
+    st.write(f"Receitas: {len(user_incomes)}")
+    st.write(f"Despesas: {len(user_expenses)}")
+    
+    # Exibir detalhes em tabelas
+    st.subheader("Detalhes")
+    
+    st.write("### Metas Financeiras")
+    if not user_goals.empty:
+        st.dataframe(user_goals[['goal_name', 'goal_amount', 'date']])
     else:
-        filtered_incomes = incomes.query("year == @selected_year").groupby("month")["amount"].sum().reset_index()
-        filtered_expenses = expenses.query("year == @selected_year").groupby("month")["amount"].sum().reset_index()
-        filtered_incomes["month"] = filtered_incomes["month"].apply(lambda x: f"{x:02d}")
-        filtered_expenses["month"] = filtered_expenses["month"].apply(lambda x: f"{x:02d}")
-
-    # Exibir os dados
+        st.write("Nenhuma meta cadastrada.")
+    
     st.write("### Receitas")
-    st.bar_chart(filtered_incomes.set_index(filtered_incomes.columns[0])["amount"])
-
+    if not user_incomes.empty:
+        st.dataframe(user_incomes[['income_name', 'amount', 'date']])
+    else:
+        st.write("Nenhuma receita cadastrada.")
+    
     st.write("### Despesas")
-    st.bar_chart(filtered_expenses.set_index(filtered_expenses.columns[0])["amount"])
+    if not user_expenses.empty:
+        st.dataframe(user_expenses[['expense_name', 'amount', 'date']])
+    else:
+        st.write("Nenhuma despesa cadastrada.")
