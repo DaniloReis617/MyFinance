@@ -60,7 +60,7 @@ def app():
                 categories = pd.concat([categories, new_category], ignore_index=True)
                 categories.to_parquet(categories_file, index=False)
                 st.success(f"Categoria '{category_name}' adicionada com sucesso!")
-                st.experimental_rerun()  # Recarregar a página para exibir a nova categoria
+                st.rerun()  # Recarregar a página para exibir a nova categoria
             except Exception as e:
                 st.error(f"Erro ao salvar a categoria: {e}")
         else:

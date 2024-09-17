@@ -33,19 +33,25 @@ def app():
     # Verificar se o DataFrame de despesas está vazio
     if not user_expenses.empty:
         # Certifique-se de que as datas não sejam nulas antes de calcular min e max
-        min_date = user_expenses['date'].min() if user_expenses['date'].notna().any() else pd.Timestamp.today()
-        max_date = user_expenses['date'].max() if user_expenses['date'].notna().any() else pd.Timestamp.today()
+        user_expenses['date'] = pd.to_datetime(user_expenses['date'])  # Converter coluna 'date' para Timestamps
+        min_date = user_expenses['date'].min().date() if user_expenses['date'].notna().any() else pd.Timestamp.today().date()
+        max_date = user_expenses['date'].max().date() if user_expenses['date'].notna().any() else pd.Timestamp.today().date()
 
         # Filtros avançados
         with st.expander("Filtrar Despesas"):
             category_filter = st.selectbox("Filtrar por Categoria", ["Todas"] + list(user_categories['category_name'].unique()))
             start_date = st.date_input("Data inicial", min_date)
             end_date = st.date_input("Data final", max_date)
-            
+
+            # Filtrar despesas com base nas datas e categoria
             if category_filter != "Todas":
                 user_expenses = user_expenses[user_expenses['category'] == category_filter]
-            user_expenses = user_expenses[(user_expenses['date'] >= pd.to_datetime(start_date)) & 
-                                          (user_expenses['date'] <= pd.to_datetime(end_date))]
+
+            # Converter a coluna 'date' em user_expenses para datetime.date para comparação
+            user_expenses = user_expenses[
+                (user_expenses['date'].dt.date >= start_date) & 
+                (user_expenses['date'].dt.date <= end_date)
+            ]
 
         # Exibir as despesas com uma tabela mais organizada e opção de filtro
         st.dataframe(user_expenses[['expense_name', 'category', 'amount', 'date', 'status']])
@@ -73,7 +79,7 @@ def app():
             expense_name = st.text_input("Nome da Despesa", value=expense_data['expense_name'])
             category = st.selectbox("Categoria", user_categories['category_name'], index=user_categories[user_categories['category_name'] == expense_data['category']].index[0])
             amount = st.number_input("Valor (R$)", min_value=0.0, step=0.01, format="%.2f", value=expense_data['amount'])
-            date = st.date_input("Data", value=pd.to_datetime(expense_data['date']))
+            date = st.date_input("Data", value=pd.to_datetime(expense_data['date']).date())  # Certificando-se de converter para date
             status = st.selectbox("Status", ["Pago", "Pendente"], index=["Pago", "Pendente"].index(expense_data['status']))
         else:
             # Novo registro
@@ -84,6 +90,9 @@ def app():
             status = st.selectbox("Status", ["Pago", "Pendente"])
         
         submit_button = st.form_submit_button("Salvar Despesa")
+
+    # Inicializar delete_button como None para evitar o erro
+    delete_button = None
 
     # Botão de exclusão separado do formulário de edição
     if expense_id != "Nova Despesa":

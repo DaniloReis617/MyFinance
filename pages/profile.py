@@ -9,6 +9,10 @@ def app():
     user_email = st.session_state.get('user_email')
     user_data = get_user_by_email(user_email)
     
+    if user_data is None:
+        st.error("Usuário não encontrado.")
+        return
+    
     with st.form(key='profile_form'):
         st.write(f"Bem-vindo, {user_email}! Aqui você pode alterar sua senha.")
         
@@ -30,5 +34,5 @@ def app():
             users.loc[users['email'] == user_email, 'password'] = user_data['password']
             
             # Salvar as alterações no arquivo Parquet
-            users.to_parquet('data/users.parquet', index=False)
+            save_user_data(users)
             st.success("Senha alterada com sucesso!")

@@ -21,7 +21,6 @@ finance_app/
 │   └── profile_image.png
 ├── utils/
 │   └── auth_utils.py
-│   └── db_utils.py
 │   └── file_utils.py
 │
 ├── app.py
@@ -47,8 +46,7 @@ finance_app/
   - `profile_image.png`: Imagem de perfil usada na página de perfil.
 
 - **utils/**: Este diretório contém utilitários e funções auxiliares.
-  - `auth_utils.py`: Funções de autenticação, como login de usuário.
-  - `db_utils.py`: Funções de banco de dados, como verificação de existência de usuário e registro de novo usuário.
+  - `auth_utils.py`: Funções de autenticação, como login de usuário, de banco de dados, como verificação de existência de usuário e registro de novo usuário.
   - `file_utils.py`: este código garante que os arquivos Parquet necessários para armazenar dados de usuários, metas, rendas e despesas sejam criados se ainda não existirem.
 - **app.py**: Arquivo principal do aplicativo que configura a navegação entre as páginas e inicializa os arquivos de dados.
 
